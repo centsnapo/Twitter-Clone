@@ -1,17 +1,81 @@
+import User from "../models/user.model.js";
+import bcrypt from 'bcryptjs';
+import { generateTokenAndSetCookie } from "../lib/utils/generateToken.js";
+
+
 export const signup = async (req, res) => {
-    res.json({
-        data: "You hit the signup endpoint",
-    });
-} 
+    try {
+        const { fullName, username, email, password } = req.body;
+
+        // Use .test() instead of .text() to check the email format
+        const emailRegex = /^[a-zA-Z0-9._-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
+
+        if (!emailRegex.test(email)) {
+            return res.status(400).json({ error: "Invalid email format" });
+        }
+
+        // Check if the username already exists
+        const existingUser = await User.findOne({ username });
+        if (existingUser) {
+            return res.status(400).json({ error: "Username is already taken" });
+        }
+
+        // Check if the email already exists
+        const existingEmail = await User.findOne({ email });
+        if (existingEmail) {
+            return res.status(400).json({ error: "Email is already taken" });
+        }
+
+    
+        if (password.length < 6)  {
+            return res.status(400).json({ error: "Password must be at least 6 characters long" });
+        }
+
+        // Hash the password before saving
+        const salt = await bcrypt.genSalt(10);
+        const hashedPassword = await bcrypt.hash(password, salt);
+
+        // Create a new user
+        const newUser = new User({
+            fullName,
+            username,
+            email,
+            password: hashedPassword,
+        });
+
+        if (newUser) {
+            // If user is successfully created, generate the token and set the cookie
+            generateTokenAndSetCookie(newUser._id, res);
+            await newUser.save();
+
+            // Return the user data as a response
+            res.status(201).json({
+                _id: newUser._id,
+                fullName: newUser.fullName,
+                username: newUser.username,
+                email: newUser.email,
+                followers: newUser.followers,
+                following: newUser.following,
+                profileImg: newUser.profileImg,
+                coverImg: newUser.coverImg,
+            });
+        } else {
+            res.status(400).json({ error: "Invalid user Data" });
+        }
+    } catch (error) {
+        console.log("Error in signup controller", error.message);
+        res.status(500).json({ error: "Internal Server Error" });
+    }
+};
 
 export const login = async (req, res) => {
     res.json({
         data: "You hit the login endpoint",
     });
-} 
+};
 
 export const logout = async (req, res) => {
     res.json({
         data: "You hit the logout endpoint",
     });
-} 
+};
